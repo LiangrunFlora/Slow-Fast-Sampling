@@ -9,7 +9,7 @@ Official PyTorch implementation of the paper "[Accelerating Diffusion Large Lang
 
 <div align="center">
 
-![Pipeline](assets/speed.svg)  
+![Pipeline](assets/speed.jpg)  
 **Fig. 1 – Throughput and Accuracy Comparison on GPQA (8-shot, Length=1024) with LLaDA and Our Proposed Methods.**
 
 </div>
