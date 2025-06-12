@@ -1,5 +1,5 @@
-# Accelerating Diffusion Large Language Models with Slow Fast Sampling: The Three Golden Principles
-Official PyTorch implementation of the paper "[Accelerating Diffusion Large Language Models with Slow Fast Sampling: The Three Golden Principles](docs/SlowFastSampling.pdf)" (**Slow Fast Sampling**).  
+# Accelerating Diffusion Large Language Models with SlowFast Sampling: The Three Golden Principles
+Official PyTorch implementation of the paper "[Accelerating Diffusion Large Language Models with SlowFast Sampling: The Three Golden Principles](docs/SlowFastSampling.pdf)" (**Slow Fast Sampling**).  
 
 ***The Three Golden Principles: Certainty · Convergence · Positional***
 
@@ -9,7 +9,7 @@ Official PyTorch implementation of the paper "[Accelerating Diffusion Large Lang
 
 <div align="center">
 
-![Pipeline](assets/speed.jpg)  
+![Pipeline](assets/speed.svg)  
 **Fig. 1 – Throughput and Accuracy Comparison on GPQA (8-shot, Length=1024) with LLaDA and Our Proposed Methods.**
 
 </div>
