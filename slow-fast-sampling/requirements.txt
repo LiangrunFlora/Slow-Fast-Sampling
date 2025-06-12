@@ -1,0 +1,16 @@
+torch  
+datasets
+tqdm
+zeno_client
+peft  
+accelerate 
+lm-eval
+datasets 
+numpy  
+torchmetrics
+transformers
+deepspeed
+huggingface_hub[hf_xet]
+calflops
+lm-eval[longbench]
+lm-eval[math]
