@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import numpy as np
 import torch
 from transformers.tokenization_utils import PaddingStrategy, TruncationStrategy
-from cache import FeatureCache
+from dllm_cache import FeatureCache
 import torch.nn.functional as F
 import numpy as np
 import accelerate
@@ -14,7 +14,7 @@ import time
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
-from utils.plot_confidence_map import plot_confidence_heatmap
+from sampling_utils.plot_confidence_map import plot_confidence_heatmap
 
 def add_gumbel_noise(logits, temperature):
     if temperature == 0:
@@ -103,7 +103,7 @@ def generate_slow_fast_sampling(
         num_blocks = gen_length // block_length
 
         feature_cache = FeatureCache()
-        feature_cache.reset_cache(prompt_length)
+        feature_cache.reset_cache(prompt_length,gen_length=gen_length)
         
         total_model_calls = 0 # For tracking computation
         totol_model_gen_length = 0
