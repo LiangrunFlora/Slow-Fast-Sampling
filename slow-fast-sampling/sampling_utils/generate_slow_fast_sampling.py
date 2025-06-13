@@ -33,24 +33,14 @@ def get_num_transfer_tokens(mask_index, steps):
     Precompute the number of tokens to transition at each step.
     Optimized to be more efficient.
     """
-    # mask_index: (batch_size, block_length)，布尔张量，表示掩码位置
-    # mask_num: (batch_size, 1)，每行掩码数量
     mask_num = mask_index.sum(dim=1, keepdim=True)
-    # base: (batch_size, 1)，每步基础转移token数
     base = mask_num // steps
-    # remainder: (batch_size, 1)，剩余token数
     remainder = mask_num % steps
-    # num_transfer_tokens: (batch_size, steps)，初始为base扩展到steps列
     num_transfer_tokens = base.expand(-1, steps).clone()
-    # 处理remainder
     if remainder.sum() > 0:
-        # indices: (steps,)，步数索引
         indices = torch.arange(steps, device=mask_index.device)
-        # mask: (batch_size, steps)，布尔张量，标记哪些位置需要+1
         mask = indices.unsqueeze(0) < remainder
-        # num_transfer_tokens: (batch_size, steps)，更新后的每步转移token数
         num_transfer_tokens[mask] += 1
-    # 返回值: (batch_size, steps)，int64类型，每步转移token数
     return num_transfer_tokens.to(torch.int64)
 
 def get_num_tokens_for_phase1_step(current_sub_cycle_mask, num_to_fill_this_step_factor=0.1):
@@ -121,7 +111,6 @@ def generate_slow_fast_sampling(
                 mask_in_current_block_abs_coords = (x[:, block_abs_start_in_x:block_abs_end_in_x] == mask_id)
                 if not mask_in_current_block_abs_coords.any():
                     break
-                # 做一个循环安全限制，设置为block长度
                 if current_sub_cycles_in_block >= max_sub_cycles_per_block:
                     break
                 
@@ -129,7 +118,6 @@ def generate_slow_fast_sampling(
 
                 # --- Per-sub-cycle state (Batch-wise independent) ---
                 sub_cycle_determined_per_item = torch.zeros(batch_size, dtype=torch.bool, device=x.device)
-                # 将周期预测history维持在一定长度，丢弃旧历史
                 history_per_item = [collections.deque(maxlen=cycle_length_stability_window) for _ in range(batch_size)]
                 
                 block_start_in_gen = block_idx * block_length
@@ -164,45 +152,32 @@ def generate_slow_fast_sampling(
                         if not sub_cycle_determined_per_item[b_idx]:
                             previous_len_item = last_sub_cycle_length_per_item[b_idx].item()
 
-                            # 1. 确定Phase 1的观察起点 (相对于 gen_length 的绝对索引)
-                            # 这个起点是上一个子周期结束的地方，也是当前我们希望开始观察新周期的地方
                             observation_abs_start_in_gen = block_start_in_gen + previous_len_item
                             
-                            # 2. 确定Phase 1的观察终点 (相对于 gen_length 的绝对索引，切片时不包含)
-                            observation_abs_end_in_gen = block_end_in_gen # 即当前块的末尾
+                            observation_abs_end_in_gen = block_end_in_gen 
 
-                            increment_len = 0 # 初始化增量长度
+                            increment_len = 0 
                             
-                            # 确保观察范围有效 (起点不能超过或等于终点)
                             if observation_abs_start_in_gen < observation_abs_end_in_gen:
-                                # 3. 提取观察范围内的置信度
                                 confidence_in_observation_scope = confidence_gen_wide[b_idx, observation_abs_start_in_gen : observation_abs_end_in_gen]
                                 
-                                # 4. 计算增量长度
-                                # 在这个观察范围(observation_scope)内找到最远的高置信度token
-                                if confidence_in_observation_scope.numel() > 0: # 确保切片不为空
+                                if confidence_in_observation_scope.numel() > 0: 
                                     above_thresh_indices_in_scope = (confidence_in_observation_scope >= cycle_len_confidence_threshold).nonzero(as_tuple=True)[0]
                                     
                                     if len(above_thresh_indices_in_scope) > 0:
-                                        # farthest_idx_in_scope 是相对于 observation_scope 起点的索引
                                         farthest_idx_in_scope = above_thresh_indices_in_scope.max().item()
-                                        increment_len = farthest_idx_in_scope + 1 # 增量长度
+                                        increment_len = farthest_idx_in_scope + 1
                                     else:
-                                        increment_len = 1 # 尝试至少扩展1 (如果后面还有空间)
+                                        increment_len = 1 
                                 else:
                                     pass 
                             else:
                                 increment_len = 0
 
-                            # 5. 计算新的累积长度
-                            # est_len 是相对于 block_start_in_gen 的总长度
                             est_len = previous_len_item + increment_len
                             
-                            # 6. 处理边界：确保 est_len 不超过 block_length
-                            # 同时，est_len 至少应该是 previous_len_item (如果increment_len为0)
-                            # 并且至少是1 (如果 previous_len_item 为0, increment_len 也为0, 那么 est_len 应该至少是1来启动)
-                            est_len = max(1, est_len) # 确保 est_len 至少是1
-                            est_len = min(est_len, block_length) # 确保不超过当前块的最大长度
+                            est_len = max(1, est_len) 
+                            est_len = min(est_len, block_length) 
                             history_per_item[b_idx].append(est_len)
 
                             if len(history_per_item[b_idx]) >= cycle_length_stability_window:
@@ -225,16 +200,13 @@ def generate_slow_fast_sampling(
                         fill_op_abs_start_in_gen = block_start_in_gen + previous_len_item_fill
                         fill_op_abs_end_in_gen = block_end_in_gen
 
-                        increment_len_p1_fill = 0 # 用于记录实际填充区域的长度
+                        increment_len_p1_fill = 0 
 
                         if fill_op_abs_start_in_gen < fill_op_abs_end_in_gen:
-                            # 3. 提取这个观察范围内的置信度和掩码
-                            #    conf_in_fill_op_scope 的长度是 fill_op_abs_end_in_gen - fill_op_abs_start_in_gen
                             conf_in_fill_op_scope = confidence_gen_wide[b_idx, fill_op_abs_start_in_gen : fill_op_abs_end_in_gen]
-                            #    mask_in_fill_op_scope 也是相对于 fill_op_abs_start_in_gen 的
                             mask_in_fill_op_scope = (x[b_idx, prompt_length + fill_op_abs_start_in_gen : prompt_length + fill_op_abs_end_in_gen] == mask_id)
                             
-                            if conf_in_fill_op_scope.numel() > 0: # 确保范围有效
+                            if conf_in_fill_op_scope.numel() > 0: 
                                 eff_conf_in_fill_op_scope = torch.where(mask_in_fill_op_scope, conf_in_fill_op_scope, torch.tensor(-np.inf, device=x.device, dtype=conf_in_fill_op_scope.dtype))
                                 
                                 num_masked_in_fill_op_scope = mask_in_fill_op_scope.sum().item()
@@ -242,15 +214,12 @@ def generate_slow_fast_sampling(
                                 if num_to_fill_p1[b_idx] > 0 and num_masked_in_fill_op_scope > 0:
                                     k = min(num_to_fill_p1[b_idx].item(), num_masked_in_fill_op_scope)
                                     phase1_high_conf_fill_indices = (conf_in_fill_op_scope >= high_confidence_threshold) & mask_in_fill_op_scope
-                                    # 如果当前confidence合格数量达到预期，则进行一次性decode
                                     if phase1_high_conf_fill_indices.any() and phase1_high_conf_fill_indices.sum().item()>1:
                                         abs_indices_to_fill = fill_op_abs_start_in_gen + phase1_high_conf_fill_indices.nonzero(as_tuple=True)[0]
                                         transfer_mask_p1[b_idx, abs_indices_to_fill] = True
                                     else:           
-                                        # 正常一步decode
                                         if k > 0:
                                             top_k_indices_relative_to_fill_scope = torch.topk(eff_conf_in_fill_op_scope, k=k).indices
-                                            # 转换回相对于 gen_length 的绝对索引
                                             abs_indices_to_fill_in_gen = fill_op_abs_start_in_gen + top_k_indices_relative_to_fill_scope
                                             transfer_mask_p1[b_idx, abs_indices_to_fill_in_gen] = True
                                 
@@ -290,14 +259,12 @@ def generate_slow_fast_sampling(
                 active_region_start_check_list = []
                 active_region_end_check_list = []
                 while True:
-                    # 1.检查是否都被decode完
                     all_p2_active_regions_filled_for_all_items = True
                     for b_idx_check in range(batch_size):
                         current_cumulative_len_check = actual_sub_cycle_length_per_item[b_idx_check].item()
                         previous_cumulative_len_check = last_sub_cycle_length_per_item[b_idx_check].item()
                         active_region_start_check_list.append(block_start_in_gen + previous_cumulative_len_check)
                         active_region_end_check_list.append(block_start_in_gen + current_cumulative_len_check)
-                        # 当前周期内都被decode完，退出
                         if active_region_start_check_list[b_idx_check] < active_region_end_check_list[b_idx_check]:
                             mask_in_ar_check = (x[b_idx_check, prompt_length + active_region_start_check_list[b_idx_check] : prompt_length + active_region_end_check_list[b_idx_check]] == mask_id)
                             if mask_in_ar_check.any(): # If any mask exists in this item's active region
@@ -314,10 +281,8 @@ def generate_slow_fast_sampling(
                         if phase_2_and_3_calls == 1:
                             cfg_x = x.clone()
                             cfg_x[prompt_index_full_x] = mask_id
-                            # cache区间之外的部分，只做一次 
                             logits_main = model(x, attention_mask=attention_mask).logits 
                             cfg_logits_main = model(cfg_x, attention_mask=attention_mask).logits
-                            # 保存cache
                             for b_idx_check in range(batch_size):
                                 cache_out_cycle_logits_list.append(logits_main[b_idx_check,  prompt_length + active_region_end_check_list[b_idx_check]:].unsqueeze(0))
                                 cache_out_cycle_cfg_logits_list.append(cfg_logits_main[b_idx_check,  prompt_length + active_region_end_check_list[b_idx_check]:].unsqueeze(0))
@@ -325,7 +290,6 @@ def generate_slow_fast_sampling(
                         else:
                             cfg_x = x.clone()
                             cfg_x[prompt_index_full_x] = mask_id
-                            # 利用cache
                             logits_main_batch = []
                             cfg_logits_main_batch = []
                             for b_idx_check in range(batch_size):
@@ -333,7 +297,6 @@ def generate_slow_fast_sampling(
                                 cfg_logits_main_part = model(cfg_x[:, :prompt_length + active_region_end_check_list[b_idx_check]], attention_mask=attention_mask).logits
                                 logits_main_batch.append(torch.cat([logits_main_part[b_idx_check].unsqueeze(0), cache_out_cycle_logits_list[b_idx_check]], dim=1))
                                 cfg_logits_main_batch.append(torch.cat([cfg_logits_main_part[b_idx_check].unsqueeze(0), cache_out_cycle_cfg_logits_list[b_idx_check]],dim=1))
-                            # 整合
                             logits_main = torch.cat(logits_main_batch, dim=0)
                             cfg_logits_main = torch.cat(cfg_logits_main_batch, dim=0)
                             logits_full = logits_main + cfg_scale * (logits_main - cfg_logits_main)
@@ -364,7 +327,6 @@ def generate_slow_fast_sampling(
                     transfer_mask_p2_and_p3 = torch.zeros_like(x0_gen, dtype=torch.bool)
                     
                     for b_idx in range(batch_size):
-                        # 周期开始和结束位置
                         sub_cycle_abs_end_in_gen = block_start_in_gen + actual_sub_cycle_length_per_item[b_idx].item()
                         sub_cycle_abs_start_in_gen = block_start_in_gen + last_sub_cycle_length_per_item[b_idx].item() 
                         
@@ -376,12 +338,10 @@ def generate_slow_fast_sampling(
 
                         # print(f"high_conf_fill_indices{high_conf_fill_indices}")
                         
-                        # 如果当前confidence合格数量达到预期，则进行一次性decode
                         if high_conf_fill_indices.any() and high_conf_fill_indices.sum().item()>1:
                             abs_indices_to_fill = sub_cycle_abs_start_in_gen + high_conf_fill_indices.nonzero(as_tuple=True)[0]
                             transfer_mask_p2_and_p3[b_idx, abs_indices_to_fill] = True
                         else:
-                            # 进行原本phase3的fix工作，即一次decode少量个数（1个）
                             n2_num_transfer_tokens = get_num_tokens_for_phase3_step(mask_in_current_block_abs_coords)
                             eff_conf_sub_cycle = torch.where(mask_in_sub_cycle_scope, conf_in_sub_cycle_scope, torch.tensor(-np.inf, device=x.device, dtype=conf_in_sub_cycle_scope.dtype))
                     
