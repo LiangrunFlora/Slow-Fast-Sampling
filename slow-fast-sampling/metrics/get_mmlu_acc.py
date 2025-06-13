@@ -19,7 +19,7 @@ def extract_exact_match_values(data):
     return exact_match_values
 
 def main():
-    file_path = '/root/autodl-tmp/LLADA_accelerate/mmlu_generative_log/GSAI-ML__LLaDA-8B-Instruct/results_2025-05-08T08-17-28.828158.json'  # Replace with the actual path
+    file_path = 'results.json'  # Replace with the actual path
     data = load_json(file_path)
     exact_match_values = extract_exact_match_values(data)
     
