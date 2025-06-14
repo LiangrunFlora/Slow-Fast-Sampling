@@ -1396,8 +1396,7 @@ class Dream(LM):
         attn_mask = attn_mask.to(device=self.device)
         feature_cache = FeatureCache()
         feature_cache.reset_cache(prompt_ids.shape[1])
-
-        generation_ids = self.model.diffusion_generate(
+        generation_ids, avg_model_calls_length, global_model_calls = self.model.diffusion_generate(
             prompt_ids,
             attention_mask=attn_mask,
             max_new_tokens=self.max_new_tokens,
@@ -1416,10 +1415,24 @@ class Dream(LM):
             self.tokenizer.decode(g[len(p) :].tolist()).split(self.tokenizer.eos_token)[0]
             for p, g in zip(prompt_ids, generation_ids.sequences)
         ]
+        
 
-        return responses
+        return responses, avg_model_calls_length, global_model_calls
 
     def generate_until(self, requests: List[Instance], disable_tqdm: bool = False):
+        # --- 初始化统计变量 ---
+        start_run_time = time.time()
+        total_generated_chars = 0 # 使用字符数作为 token 的代理
+        accumulated_avg_model_calls_length = 0.0
+        accumulated_global_model_calls = 0.0
+        num_batches_processed = 0
+        task_name = requests[0].task_name
+        # 确保 ./time_tracker 目录存在
+        os.makedirs("./time_tracker_dream", exist_ok=True)
+        # 日志文件名包含任务名称和时间戳
+        log_file_name = f"{task_name}_Timestamp_{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}.txt"
+        log_file = f"./time_tracker_dream/{log_file_name}"
+        
         res = []
 
         pbar = tqdm(
@@ -1431,7 +1444,12 @@ class Dream(LM):
         for batch_idx in range(0, len(requests), self.batch_size):
             batch_requests = requests[batch_idx : batch_idx + self.batch_size]
             contexts, gen_args = zip(*[req.arguments for req in batch_requests])
-            responses = self._generate_batch(contexts)
+            responses, avg_model_calls_length, global_model_calls = self._generate_batch(contexts)
+            # --- 累积统计数据 ---
+            accumulated_avg_model_calls_length += avg_model_calls_length
+            accumulated_global_model_calls += global_model_calls
+            num_batches_processed += 1
+            
             if not self.escape_until:
                 for i, r in enumerate(responses):
                     for s in gen_args[0]['until']:
@@ -1440,9 +1458,48 @@ class Dream(LM):
 
             # if self.rank == 0:
             #     print(f"Context:\n{contexts[0]}\nResponse:\n{responses[0]}\n")
+            # 累积生成字符数 (在 'until' 处理之后)
+
+            total_generated_chars += self.max_new_tokens # 或者使用真实 tokenizer.encode(r_final) 的长度
 
             res.extend(responses)
             pbar.update(len(contexts))
+            
+        # --- 计算最终统计数据 ---
+        end_run_time = time.time()
+        total_execution_time = end_run_time - start_run_time
+
+        tps = (total_generated_chars / total_execution_time) if total_execution_time > 0 else 0
+        
+        avg_overall_model_calls_length = (accumulated_avg_model_calls_length / num_batches_processed) if num_batches_processed > 0 else 0
+        avg_overall_global_model_calls = (accumulated_global_model_calls / num_batches_processed) if num_batches_processed > 0 else 0
+        # --- 统计数据计算结束 ---
+
+        # --- 输出到文件 ---
+        if self.rank == 0: # 通常只在主进程记录日志
+            # 准备统计信息字符串
+            stats_summary = f"""
+            Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            Total Requests: {len(requests)}
+            Batch Size: {self.batch_size}
+            Total Execution Time: {total_execution_time:.4f} seconds
+            Total Characters Generated: {total_generated_chars} '(token count)'
+            TPS (Chars/Sec or Tokens/Sec): {tps:.2f}
+            Number of Batches Processed: {num_batches_processed}
+            Avg. 'avg_model_calls_length' (per batch avg.): {avg_overall_model_calls_length:.2f}
+            Avg. 'global_model_calls' (per batch avg.): {avg_overall_global_model_calls:.2f}
+            ---
+            """
+            print("\n--- Generation Stats ---")
+            print(stats_summary.strip())
+            print("--- End Generation Stats ---\n")
+
+            try:
+                with open(log_file, "a", encoding="utf-8") as f:
+                    f.write(stats_summary)
+            except Exception as e:
+                print(f"Error writing stats to file {log_file}: {e}")
+        # --- 文件输出结束 ---
 
         return res
 
