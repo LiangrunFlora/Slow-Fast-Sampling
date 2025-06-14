@@ -775,17 +775,8 @@ class DreamGenerationMixin:
                         continue
                     
                     # 获取全局的confidence和x0(prompt之后的)
-                    if temperature > 0:
-                        logits_p1 = logits_p1 / temperature
                     probs_p1 = torch.softmax(logits_p1[b_idx, prompt_length:], dim=-1)
-                    if temperature > 0:
-                        try:
-                            x0_p1 = dists.Categorical(probs=probs_p1).sample()
-                            confidence_p1 = torch.gather(probs_p1, -1, x0_p1.unsqueeze(-1)).squeeze(-1)
-                        except:
-                            confidence_p1, x0_p1 = probs_p1.max(dim=-1)
-                    else:
-                        confidence_p1, x0_p1 = probs_p1.max(dim=-1)
+                    confidence_p1, x0_p1 = probs_p1.max(dim=-1)
 
                     confidence_undecoded_in_cycle = torch.where(mask_positions_bool_p1[b_idx, start_abs_idx:end_abs_idx], confidence_p1[start_cycle_idx:end_cycle_idx], torch.tensor(-np.inf, device=x.device, dtype=confidence_p1.dtype))
                     if start_abs_idx < end_abs_idx:
