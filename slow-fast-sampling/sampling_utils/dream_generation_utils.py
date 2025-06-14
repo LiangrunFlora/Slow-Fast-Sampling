@@ -596,7 +596,6 @@ class DreamGenerationMixin:
                 attention_mask_padded.unsqueeze(1).unsqueeze(-1),
             )
         else:
-            print(f"enter")
             tok_idx = None
             attention_mask_for_model = "full"
 
