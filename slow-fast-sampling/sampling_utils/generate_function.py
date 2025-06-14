@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 import torch
 from transformers.tokenization_utils import PaddingStrategy, TruncationStrategy
-from cache import FeatureCache
+from dllm_cache import FeatureCache
 import torch.nn.functional as F
 import numpy as np
 import accelerate
