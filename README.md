@@ -80,10 +80,13 @@ Huge thanks to these amazing communities for paving the way.
 If you find this work useful, please cite our paper:
 
 ```bibtex
-@article{wei2025accelerating,
-  title={Accelerating Diffusion Large Language Models with SlowFast: The Three Golden Principles},
-  author={Wei, Qingyan and Zhang, Yaojie and Liu, Zhiyuan and Liu, Dongrui and Zhang, Linfeng},
-  journal={arXiv preprint arXiv:2506.10848},
-  year={2025}
+@misc{wei2025acceleratingdiffusionlargelanguage,
+      title={Accelerating Diffusion Large Language Models with SlowFast Sampling: The Three Golden Principles}, 
+      author={Qingyan Wei and Yaojie Zhang and Zhiyuan Liu and Dongrui Liu and Linfeng Zhang},
+      year={2025},
+      eprint={2506.10848},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2506.10848}, 
 }
 ```
