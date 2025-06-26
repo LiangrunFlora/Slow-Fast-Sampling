@@ -76,3 +76,14 @@ This project stands on the shoulders of [LLaDA](https://github.com/ML-GSAI/LLaDA
 Huge thanks to these amazing communities for paving the way.
 
 ## 📌 Citation
+
+If you find this work useful, please cite our paper:
+
+```bibtex
+@article{wei2025accelerating,
+  title={Accelerating Diffusion Large Language Models with SlowFast: The Three Golden Principles},
+  author={Wei, Qingyan and Zhang, Yaojie and Liu, Zhiyuan and Liu, Dongrui and Zhang, Linfeng},
+  journal={arXiv preprint arXiv:2506.10848},
+  year={2025}
+}
+```
